@@ -1,7 +1,7 @@
 import os, sys
 
 from flask import Flask, request, abort, jsonify
-import requests
+
 
 
 from linebot import (
@@ -49,18 +49,10 @@ def callback():
 def handle_message(event):
     input_text = event.message.text
 
-    if input_text == '@查詢匯率':
-        resp = requests.get('https://tw.rter.info/capi.php')
-        currency_data = resp.json()
-        usd_to_twd = currency_data['USDTWD']['Exrate']
 
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text=f'美元 USD 對台幣 TWD：1:{usd_to_twd}'))
-    else:
-        line_bot_api.reply_message(
-        event.reply_token,
-        TextSendMessage(text=event.message.text))
+    line_bot_api.reply_message(
+    event.reply_token,
+    TextSendMessage(text=event.message.text))
 
 
 if __name__ == "__main__":
