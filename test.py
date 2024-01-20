@@ -1,59 +1,48 @@
-import os, sys
+""" It is a Flask server that sign a transaction and send the signed transaction back to the client. """
 
-from flask import Flask, request, abort, jsonify
-
-
-
-from linebot import (
-    LineBotApi, WebhookHandler
-)
-from linebot.exceptions import (
-    InvalidSignatureError
-)
-from linebot.models import (
-    MessageEvent, TextMessage, TextSendMessage,
-)
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from web3 import Web3
+import math as Math
+import os
 
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)  # Adjust origins as needed
 
-# get channel_secret and channel_access_token from your environment variable
-channel_secret = os.getenv('LINE_CHANNEL_SECRET', None)
-channel_access_token = os.getenv('LINE_CHANNEL_ACCESS_TOKEN', None)
-if channel_secret is None or channel_access_token is None:
-    print('Specify LINE_CHANNEL_SECRET and LINE_CHANNEL_ACCESS_TOKEN as environment variables.')
-    sys.exit(1)
-
-line_bot_api = LineBotApi(channel_access_token)
-handler = WebhookHandler(channel_secret)
-
-
-@app.route('/callback', methods=['POST'])
-def callback():
-    # get X-Line-Signature header value
-    signature = request.headers['X-Line-Signature']
-
-    # get request body as text
-    body = request.get_data(as_text=True)
-    app.logger.info('Request body: ' + body)
-
-    # handle webhook body
+@app.route("/", methods=["POST", "OPTIONS"])
+def handle_post_request():
     try:
-        handler.handle(body, signature)
-    except InvalidSignatureError:
-        print('Invalid signature. Please check your channel access token/channel secret.')
-        abort(400)
-
-    return 'OK'
-
-@handler.add(MessageEvent, message=TextMessage)
-def handle_message(event):
-    input_text = event.message.text
-
-
-    line_bot_api.reply_message(
-    event.reply_token,
-    TextSendMessage(text=event.message.text))
-
+        myPrivateKey = "053cfea0a9b35fb9608ab27a55d4392e89ab13a556e19bf1f03ef93ebc76ff53"
+        data = request.get_json()  # 獲取POST請求中的JSON數據
+        receiver_address = data.get('receiverAddress')
+        value = data.get('value')
+        
+        # 在這裡可以使用receiver_address和value進行相應的處理
+        # 例如：存儲到數據庫，執行某些業務邏輯，等等。
+        """  sign a transaction and send the raw transaction back to the client. """
+        # 1. 連接到以太坊節點
+        w3 = Web3(Web3.HTTPProvider("https://sepolia.infura.io/v3/20afaf6225ba454ab4ef10b82f76ba0c"))
+        # 2. 獲取nonce
+        PA=w3.eth.account.from_key(myPrivateKey)
+        nonce = w3.eth.get_transaction_count(PA.address,'pending')
+        gas_price = w3.eth.gas_price
+        newGasPrice = Math.floor(float(gas_price) * 1.1)
+        # 3. 創建交易
+        transaction = {
+            "to": receiver_address,
+            "value": w3.to_wei(value, "ether"),
+            "gas": 2000000,
+            "gasPrice": newGasPrice,
+            "nonce": nonce,
+            "chainId": 11155111
+        }
+        # 4. 簽名交易
+        signed_transaction = w3.eth.account.sign_transaction(transaction, myPrivateKey)
+        print(signed_transaction)
+        """ return the signed transaction to the client. """
+        return jsonify({"status": "success", "message": "signed transaction", "data": signed_transaction.rawTransaction.hex(),})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))
